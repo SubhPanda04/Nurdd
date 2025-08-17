@@ -1,27 +1,31 @@
-const supabase = require('./supabaseClient');
+const supabase = require('../supabaseClient');
 
-async function createWebsiteAnalysisTable() {
-    const { data, error } = await supabase.rpc('execute_sql', {
-        sql: `
-      CREATE TABLE IF NOT EXISTS website_analysis (
-        id SERIAL PRIMARY KEY,
-        url VARCHAR(500) NOT NULL,
-        brand_name VARCHAR(255),
-        description TEXT,
-        enhanced_description TEXT,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      );
-    `
-    });
+async function checkDatabaseSchema() {
+    console.log('Checking database schema...');
 
-    if (error) {
-        console.error('Error creating table:', error);
-    } else {
-        console.log('Table created successfully');
+    try {
+        const { data, error } = await supabase
+            .from('website_analysis')
+            .select('id, url, brand_name, description, raw_description, enhanced, created_at, updated_at')
+            .limit(1);
+
+        if (error) {
+            console.error('Schema check failed:', error.message);
+            if (error.message.includes('column')) {
+                console.log('❌ Database schema needs updating');
+                return false;
+            }
+        } else {
+            console.log('✅ Database schema is up to date');
+            return true;
+        }
+
+    } catch (error) {
+        console.error('Error checking schema:', error);
+        return false;
     }
 }
 
 module.exports = {
-    createWebsiteAnalysisTable
+    checkDatabaseSchema
 };
