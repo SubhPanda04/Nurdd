@@ -1,13 +1,23 @@
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
 const logger = require('../utils/logger');
+const AIEnhancementService = require('./aiEnhancementService');
 
 class WebsiteScrapingService {
 
-    static async scrapeWebsite(url) {
+    constructor() {
+        this.aiEnhancement = new AIEnhancementService();
+    }
+
+    static async scrapeWebsite(url, options = {}) {
+        const instance = new WebsiteScrapingService();
+        return await instance.scrapeWebsiteInstance(url, options);
+    }
+
+    async scrapeWebsiteInstance(url, options = {}) {
         let browser = null;
         try {
-            if (!this.isValidUrl(url)) {
+            if (!WebsiteScrapingService.isValidUrl(url)) {
                 throw new Error('Invalid URL format');
             }
 
@@ -57,7 +67,21 @@ class WebsiteScrapingService {
             // Parse with Cheerio
             const $ = cheerio.load(content);
             const brandName = this.extractBrandName($);
-            const description = this.extractDescription($);
+            const rawDescription = this.extractDescription($);
+
+            // Enhanced AI processing for description
+            const enhanceDescription = options.enhanceDescription !== false; // Default to true
+            let description = rawDescription;
+
+            if (enhanceDescription) {
+                try {
+                    description = await this.aiEnhancement.enhanceDescription(rawDescription, brandName, url);
+                    logger.info(`Description enhanced using AI (${rawDescription.length} -> ${description.length} chars)`);
+                } catch (enhanceError) {
+                    logger.warn(`AI enhancement failed, using original description: ${enhanceError.message}`);
+                    description = rawDescription;
+                }
+            }
 
             logger.info(`Successfully scraped ${url}: Brand="${brandName}", Description length=${description.length}`);
 
@@ -65,6 +89,9 @@ class WebsiteScrapingService {
                 url,
                 brandName,
                 description,
+                rawDescription,
+                enhanced: enhanceDescription && description !== rawDescription,
+                aiStats: this.aiEnhancement.getStats(),
                 success: true
             };
 
@@ -97,6 +124,8 @@ class WebsiteScrapingService {
                 url,
                 brandName: null,
                 description: null,
+                rawDescription: null,
+                enhanced: false,
                 success: false,
                 error: userFriendlyMessage,
                 errorCategory,
@@ -113,7 +142,7 @@ class WebsiteScrapingService {
         }
     }
 
-    static extractBrandName($) {
+    extractBrandName($) {
         let brandName =
             $('meta[property="og:site_name"]').attr('content') ||
             $('meta[name="application-name"]').attr('content') ||
@@ -125,7 +154,7 @@ class WebsiteScrapingService {
         return brandName.trim().substring(0, 255);
     }
 
-    static extractDescription($) {
+    extractDescription($) {
         let description =
             $('meta[name="description"]').attr('content') ||
             $('meta[property="og:description"]').attr('content') ||
