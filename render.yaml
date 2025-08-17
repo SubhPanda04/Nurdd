@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: nurdd-api
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    # Environment variables from dashboard:
+    # SUPABASE_URL
+    # SUPABASE_KEY  
+    # GEMINI_API_KEY
