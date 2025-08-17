@@ -3,7 +3,7 @@ const router = express.Router();
 const supabase = require('../supabaseClient');
 const WebsiteScrapingService = require('../services/scrapingService');
 const { asyncHandler } = require('../middleware/errorHandler');
-const { analysisRateLimit } = require('../middleware/security');
+const { analysisRateLimit } = require('../middleware/RateLimit');
 const {
     validateUrl,
     validateId,
@@ -17,14 +17,12 @@ router.post('/analyze',
     validateUrl,
     checkValidationResult,
     asyncHandler(async (req, res) => {
-        const { url } = req.body;
+        const { url, enhanceDescription = true } = req.body;
 
-        const { url } = req.body;
-
-        logger.info(`Analysis request for URL: ${url}`);
-
-        // Scrape the website
-        const scrapingResult = await WebsiteScrapingService.scrapeWebsite(url);
+        logger.info(`Analysis request for URL: ${url} (AI enhancement: ${enhanceDescription})`);
+        const scrapingResult = await WebsiteScrapingService.scrapeWebsite(url, {
+            enhanceDescription
+        });
 
         if (!scrapingResult.success) {
             return res.status(422).json({
@@ -34,13 +32,14 @@ router.post('/analyze',
             });
         }
 
-        // Store in database
         const { data, error } = await supabase
             .from('website_analysis')
             .insert({
                 url: scrapingResult.url,
                 brand_name: scrapingResult.brandName,
-                description: scrapingResult.description
+                description: scrapingResult.description,
+                raw_description: scrapingResult.rawDescription,
+                enhanced: scrapingResult.enhanced
             })
             .select();
 
@@ -52,7 +51,11 @@ router.post('/analyze',
         logger.info(`Analysis completed successfully for URL: ${url}`);
         res.status(201).json({
             message: 'Website analyzed successfully',
-            data: data[0]
+            data: {
+                ...data[0],
+                aiStats: scrapingResult.aiStats,
+                enhanced: scrapingResult.enhanced
+            }
         });
     })
 );
@@ -198,6 +201,111 @@ router.delete('/:id', async (req, res) => {
         console.error('Delete website error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
+});
+
+// POST enhance description for existing record
+router.post('/:id/enhance',
+    validateId,
+    checkValidationResult,
+    asyncHandler(async (req, res) => {
+        const { id } = req.params;
+
+        logger.info(`Enhancement request for record ID: ${id}`);
+
+        // Get the existing record
+        const { data: existingData, error: fetchError } = await supabase
+            .from('website_analysis')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (fetchError) {
+            if (fetchError.code === 'PGRST116') {
+                return res.status(404).json({ error: 'Website record not found' });
+            }
+            return res.status(500).json({ error: 'Failed to fetch website record' });
+        }
+
+        // Check if already enhanced
+        if (existingData.enhanced) {
+            return res.status(400).json({
+                error: 'Description is already enhanced',
+                data: existingData
+            });
+        }
+
+        // Use raw description if available, otherwise current description
+        const descriptionToEnhance = existingData.raw_description || existingData.description;
+
+        if (!descriptionToEnhance || descriptionToEnhance.trim().length < 10) {
+            return res.status(400).json({
+                error: 'Description too short or empty for enhancement'
+            });
+        }
+
+        try {
+            // Create AI enhancement service instance
+            const WebsiteScrapingService = require('../services/scrapingService');
+            const aiEnhancement = new (require('../services/aiEnhancementService'))();
+
+            const enhancedDescription = await aiEnhancement.enhanceDescription(
+                descriptionToEnhance,
+                existingData.brand_name,
+                existingData.url
+            );
+
+            // Update the record
+            const { data, error } = await supabase
+                .from('website_analysis')
+                .update({
+                    description: enhancedDescription,
+                    raw_description: existingData.raw_description || existingData.description,
+                    enhanced: true,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', id)
+                .select();
+
+            if (error) {
+                logger.error('Database error during enhancement update:', error);
+                return res.status(500).json({ error: 'Failed to update enhanced description' });
+            }
+
+            logger.info(`Description enhanced successfully for record ID: ${id}`);
+
+            res.json({
+                message: 'Description enhanced successfully',
+                data: {
+                    ...data[0],
+                    aiStats: aiEnhancement.getStats()
+                }
+            });
+
+        } catch (enhanceError) {
+            logger.error(`Enhancement failed for record ID ${id}: ${enhanceError.message}`);
+            return res.status(500).json({
+                error: 'AI enhancement failed',
+                details: enhanceError.message
+            });
+        }
+    })
+);
+
+// GET AI enhancement status and capabilities
+router.get('/ai/status', (req, res) => {
+    const AIEnhancementService = require('../services/aiEnhancementService');
+    const aiService = new AIEnhancementService();
+
+    res.json({
+        message: 'AI enhancement status',
+        ...aiService.getStats(),
+        features: {
+            enhanceDescription: true,
+            fallbackMode: !aiService.isAvailable(),
+            supportedLanguages: ['en'],
+            maxDescriptionLength: 1000
+        }
+    });
 });
 
 module.exports = router;
