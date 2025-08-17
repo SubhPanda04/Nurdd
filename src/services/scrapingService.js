@@ -29,8 +29,8 @@ class WebsiteScrapingService {
             // Configure browser launch options for production vs development
             const launchOptions = {
                 headless: true,
-                timeout: 30000,
-                args: process.env.NODE_ENV === 'production'
+                timeout: 20000, // Reduced timeout
+                args: process.env.NODE_ENV === 'production' 
                     ? [
                         ...chromium.args,
                         '--no-sandbox',
@@ -40,7 +40,12 @@ class WebsiteScrapingService {
                         '--no-first-run',
                         '--single-process',
                         '--no-zygote',
-                        '--disable-gpu'
+                        '--disable-gpu',
+                        '--memory-pressure-off',
+                        '--max_old_space_size=100',
+                        '--disable-background-timer-throttling',
+                        '--disable-backgrounding-occluded-windows',
+                        '--disable-renderer-backgrounding'
                     ]
                     : [
                         '--no-sandbox',
@@ -49,7 +54,8 @@ class WebsiteScrapingService {
                         '--disable-accelerated-2d-canvas',
                         '--no-first-run',
                         '--no-zygote',
-                        '--disable-gpu'
+                        '--disable-gpu',
+                        '--memory-pressure-off'
                     ]
             };
 
@@ -61,20 +67,19 @@ class WebsiteScrapingService {
             browser = await puppeteer.launch(launchOptions);
 
             const page = await browser.newPage();
-            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-            await page.setViewport({ width: 1920, height: 1080 });
-            await page.setDefaultNavigationTimeout(30000);
-            await page.setDefaultTimeout(30000);
-
-            // Navigate to the website with retry logic
+            
+            // Reduce memory usage
+            await page.setViewport({ width: 1280, height: 720 }); // Smaller viewport
+            await page.setDefaultNavigationTimeout(20000); // Reduced timeout
+            await page.setDefaultTimeout(20000);            // Navigate to the website with retry logic
             let content;
-            let retries = 2;
+            let retries = 1; // Reduced retries to save memory
 
             while (retries > 0) {
                 try {
                     await page.goto(url, {
-                        waitUntil: 'networkidle0',
-                        timeout: 30000
+                        waitUntil: 'domcontentloaded', // Faster loading
+                        timeout: 20000 // Reduced timeout
                     });
                     content = await page.content();
                     break;
@@ -83,7 +88,7 @@ class WebsiteScrapingService {
                     if (retries === 0) throw navError;
 
                     logger.warn(`Navigation failed for ${url}, retrying... (${retries} attempts left)`);
-                    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced wait time
                 }
             }
 
@@ -157,7 +162,17 @@ class WebsiteScrapingService {
         } finally {
             if (browser) {
                 try {
+                    // Ensure all pages are closed
+                    const pages = await browser.pages();
+                    await Promise.all(pages.map(page => page.close()));
+                    
+                    // Close browser
                     await browser.close();
+                    
+                    // Force garbage collection if available
+                    if (global.gc) {
+                        global.gc();
+                    }
                 } catch (closeError) {
                     logger.error(`Failed to close browser: ${closeError.message}`);
                 }

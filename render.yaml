@@ -11,6 +11,8 @@ services:
         value: production
       - key: PORT
         value: 10000
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=256"
     # Environment variables from dashboard:
     # SUPABASE_URL
     # SUPABASE_KEY  
