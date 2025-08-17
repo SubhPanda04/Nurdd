@@ -2,6 +2,9 @@ const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
 const logger = require('../utils/logger');
 const AIEnhancementService = require('./aiEnhancementService');
+const chromium = process.env.NODE_ENV === 'production'
+    ? require('@sparticuz/chromium')
+    : null;
 
 class WebsiteScrapingService {
 
@@ -23,19 +26,39 @@ class WebsiteScrapingService {
 
             logger.info(`Starting scrape for URL: ${url}`);
 
-            browser = await puppeteer.launch({
+            // Configure browser launch options for production vs development
+            const launchOptions = {
                 headless: true,
                 timeout: 30000,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--disable-gpu'
-                ]
-            });
+                args: process.env.NODE_ENV === 'production'
+                    ? [
+                        ...chromium.args,
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-accelerated-2d-canvas',
+                        '--no-first-run',
+                        '--single-process',
+                        '--no-zygote',
+                        '--disable-gpu'
+                    ]
+                    : [
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-accelerated-2d-canvas',
+                        '--no-first-run',
+                        '--no-zygote',
+                        '--disable-gpu'
+                    ]
+            };
+
+            // Set executable path for production (Render)
+            if (process.env.NODE_ENV === 'production') {
+                launchOptions.executablePath = await chromium.executablePath();
+            }
+
+            browser = await puppeteer.launch(launchOptions);
 
             const page = await browser.newPage();
             await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
