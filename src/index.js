@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
-const { generalRateLimit, requestTimeout } = require('./middleware/security');
+const { generalRateLimit, requestTimeout } = require('./middleware/RateLimit');
 const logger = require('./utils/logger');
 const websiteRoutes = require('./routes/websiteRoutes');
 const app = express();
