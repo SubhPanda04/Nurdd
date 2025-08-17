@@ -15,13 +15,13 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
     logger.info(`${req.method} ${req.path} - ${req.ip}`);
-    
+
     // Log memory usage for analysis endpoints
     if (req.path.includes('/analyze')) {
         const memUsage = process.memoryUsage();
         logger.info(`Memory before analysis: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`);
     }
-    
+
     next();
 });
 app.get('/', (req, res) => {
@@ -40,7 +40,7 @@ app.get('/health', (req, res) => {
         heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
         external: Math.round(memUsage.external / 1024 / 1024)
     };
-    
+
     res.json({
         status: 'healthy',
         timestamp: new Date().toISOString(),

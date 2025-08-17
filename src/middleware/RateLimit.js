@@ -2,7 +2,7 @@ const rateLimit = require('express-rate-limit');
 
 const createRateLimit = (windowMs = 15 * 60 * 1000, max = 100) => {
     return rateLimit({
-        windowMs, 
+        windowMs,
         max,
         message: {
             error: 'Too many requests from this IP, please try again later.',

@@ -30,7 +30,7 @@ class WebsiteScrapingService {
             const launchOptions = {
                 headless: true,
                 timeout: 20000, // Reduced timeout
-                args: process.env.NODE_ENV === 'production' 
+                args: process.env.NODE_ENV === 'production'
                     ? [
                         ...chromium.args,
                         '--no-sandbox',
@@ -67,7 +67,7 @@ class WebsiteScrapingService {
             browser = await puppeteer.launch(launchOptions);
 
             const page = await browser.newPage();
-            
+
             // Reduce memory usage
             await page.setViewport({ width: 1280, height: 720 }); // Smaller viewport
             await page.setDefaultNavigationTimeout(20000); // Reduced timeout
@@ -165,10 +165,10 @@ class WebsiteScrapingService {
                     // Ensure all pages are closed
                     const pages = await browser.pages();
                     await Promise.all(pages.map(page => page.close()));
-                    
+
                     // Close browser
                     await browser.close();
-                    
+
                     // Force garbage collection if available
                     if (global.gc) {
                         global.gc();
