@@ -1,0 +1,26 @@
+{
+    "name": "webapi",
+    "version": "1.0.0",
+    "description": "API for website analysis and CRUD operations.",
+    "main": "src/index.js",
+    "scripts": {
+        "start": "node src/index.js",
+        "dev": "nodemon src/index.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "@supabase/supabase-js": "^2.55.0",
+        "cheerio": "^1.1.0",
+        "cors": "^2.8.5",
+        "dotenv": "^17.2.1",
+        "express": "^4.18.2",
+        "express-rate-limit": "^8.0.1",
+        "express-validator": "^7.2.1",
+        "puppeteer": "^24.16.2"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.1"
+    }
+}
